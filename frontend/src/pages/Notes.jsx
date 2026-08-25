@@ -13,6 +13,7 @@ export default function Notes() {
   const [summary, setSummary] = React.useState(null);
   const [notes, setNotes] = React.useState([]);
   const [binNotes, setBinNotes] = React.useState([]);
+  const [binFolders, setBinFolders] = React.useState([]);
   const [folders, setFolders] = React.useState([]);
   const [selectedFolderId, setSelectedFolderId] = React.useState(null);
   const [isBin, setIsBin] = React.useState(false);
@@ -27,6 +28,7 @@ export default function Notes() {
       .then(async ([data, folderData, binData]) => {
         setFolders(folderData.folders);
         setBinNotes(binData.notes);
+        setBinFolders(binData.folders || []);
         if (data.notes.length) {
           setNotes(data.notes);
           setSelectedNoteId(data.notes[0]._id);
@@ -130,6 +132,35 @@ export default function Notes() {
     }
   };
 
+  const restoreFolder = async (folderToRestore) => {
+    try {
+      const data = await request(`/bin/folders/${folderToRestore._id}/restore`, { method: "POST" });
+      setBinFolders((currentBin) => currentBin.filter((folder) => folder._id !== folderToRestore._id));
+      setBinNotes((currentBin) => currentBin.filter((item) => String(item.folderId) !== String(folderToRestore._id)));
+      setFolders((currentFolders) => [...currentFolders, data.folder]);
+      const restoredNotes = binNotes.filter((item) => String(item.folderId) === String(folderToRestore._id));
+      setNotes((currentNotes) => [...restoredNotes.map(({ deletedAt, ...note }) => note), ...currentNotes]);
+      setIsBin(false);
+      setSelectedFolderId(data.folder._id);
+      setSelectedNoteId(restoredNotes[0]?._id || null);
+      setError("");
+    } catch (restoreError) {
+      setError(restoreError.message);
+    }
+  };
+
+  const permanentlyDeleteFolder = async (folderToDelete) => {
+    if (!window.confirm(`Delete project "${folderToDelete.name}" and all its notes permanently?`)) return;
+    try {
+      await request(`/bin/folders/${folderToDelete._id}`, { method: "DELETE" });
+      setBinFolders((currentBin) => currentBin.filter((folder) => folder._id !== folderToDelete._id));
+      setBinNotes((currentBin) => currentBin.filter((item) => String(item.folderId) !== String(folderToDelete._id)));
+      setError("");
+    } catch (deleteError) {
+      setError(deleteError.message);
+    }
+  };
+
   const permanentlyDeleteNote = async (noteToDelete) => {
     if (!window.confirm(`Delete "${noteToDelete.title || "Untitled Note"}" permanently?`)) return;
     try {
@@ -146,6 +177,7 @@ export default function Notes() {
     try {
       await request("/bin", { method: "DELETE" });
       setBinNotes([]);
+      setBinFolders([]);
       setError("");
     } catch (emptyError) {
       setError(emptyError.message);
@@ -153,12 +185,27 @@ export default function Notes() {
   };
 
   const deleteFolder = async (folderToDelete) => {
-    if (!window.confirm(`Delete project "${folderToDelete.name}"? Its notes will become unfiled.`)) return;
+    if (!window.confirm(`Delete project "${folderToDelete.name}"? Its notes will be moved to Bin.`)) return;
     try {
       await request(`/folders/${folderToDelete._id}`, { method: "DELETE" });
-      setFolders((currentFolders) => currentFolders.filter((folder) => folder._id !== folderToDelete._id));
-      setNotes((currentNotes) => currentNotes.map((item) => item.folderId === folderToDelete._id ? { ...item, folderId: undefined } : item));
-      if (selectedFolderId === folderToDelete._id) selectFolder(null);
+      const [data, folderData, binData] = await Promise.all([
+        request("/notes"),
+        request("/folders"),
+        request("/bin"),
+      ]);
+      setNotes(data.notes);
+      setFolders(folderData.folders);
+      setBinNotes(binData.notes);
+      setBinFolders(binData.folders || []);
+      const remainingNotes = data.notes;
+      if (selectedFolderId === folderToDelete._id) {
+        setSelectedFolderId(null);
+        setSelectedNoteId(remainingNotes[0]?._id || null);
+        setSummary(null);
+      } else if (!remainingNotes.some((item) => item._id === selectedNoteId)) {
+        setSelectedNoteId(remainingNotes[0]?._id || null);
+        setSummary(null);
+      }
       setError("");
     } catch (deleteError) {
       setError(deleteError.message);
@@ -224,10 +271,13 @@ export default function Notes() {
           onDeleteFolder={deleteFolder}
           onDeleteNote={deleteNote}
           binNotes={binNotes}
+          binFolders={binFolders}
           isBin={isBin}
           onSelectBin={selectBin}
           onRestoreNote={restoreNote}
+          onRestoreFolder={restoreFolder}
           onPermanentlyDeleteNote={permanentlyDeleteNote}
+          onPermanentlyDeleteFolder={permanentlyDeleteFolder}
           onEmptyBin={emptyBin}
           selectedNoteId={selectedNoteId}
           onSelectNote={setSelectedNoteId}

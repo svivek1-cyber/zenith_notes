@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { request } from "../AuthContext";
 
 export default function TodoVersionControl({
@@ -18,6 +18,9 @@ export default function TodoVersionControl({
   const [versions, setVersions] = useState([]);
   const [restoringVersion, setRestoringVersion] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editedTaskTitle, setEditedTaskTitle] = useState("");
+  const editingTaskInputRef = useRef(null);
 
   useEffect(() => {
     setIsLoading(true);
@@ -60,31 +63,6 @@ export default function TodoVersionControl({
     }
   };
 
-  const restoreVersion = async (versionId) => {
-    setRestoringVersion(versionId);
-    try {
-      const data = await request(
-        `/notes/${noteId}/versions/${versionId}/restore`,
-        { method: "POST" },
-      );
-      onNoteChange(data.note);
-      setVersions((currentVersions) => [
-        {
-          _id: data.note._id,
-          title: note.title,
-          body: note.body,
-          createdAt: new Date(),
-        },
-        ...currentVersions,
-      ]);
-      setError("");
-    } catch (restoreError) {
-      setError(restoreError.message);
-    } finally {
-      setRestoringVersion(null);
-    }
-  };
-
   const toggleTask = async (task) => {
     try {
       const data = await request(`/tasks/${task._id}`, {
@@ -107,6 +85,72 @@ export default function TodoVersionControl({
       );
     } catch (taskError) {
       setError(taskError.message);
+    }
+  };
+
+  const startEditingTask = (task) => {
+    setEditingTaskId(task._id);
+    setEditedTaskTitle(task.title);
+  };
+
+  const cancelEditingTask = () => {
+    setEditingTaskId(null);
+    setEditedTaskTitle("");
+  };
+
+  useEffect(() => {
+    if (editingTaskId === null) return undefined;
+
+    const handleOutsideEditClick = (event) => {
+      if (editingTaskInputRef.current?.contains(event.target)) return;
+      if (event.target.closest("[data-task-edit-save]")) return;
+      cancelEditingTask();
+    };
+
+    document.addEventListener("mousedown", handleOutsideEditClick);
+    return () =>
+      document.removeEventListener("mousedown", handleOutsideEditClick);
+  }, [editingTaskId]);
+
+  const editTask = async (taskId) => {
+    const title = editedTaskTitle.trim();
+    if (!title) return;
+    try {
+      const data = await request(`/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+      });
+      setTasks((currentTasks) =>
+        currentTasks.map((task) => (task._id === taskId ? data.task : task)),
+      );
+      cancelEditingTask();
+    } catch (taskError) {
+      setError(taskError.message);
+    }
+  };
+
+  const restoreVersion = async (versionId) => {
+    setRestoringVersion(versionId);
+    try {
+      const data = await request(
+        `/notes/${noteId}/versions/${versionId}/restore`,
+        { method: "POST" },
+      );
+      onNoteChange(data.note);
+      setVersions((currentVersions) => [
+        {
+          _id: data.note._id,
+          title: note.title,
+          body: note.body,
+          createdAt: new Date(),
+        },
+        ...currentVersions,
+      ]);
+      setError("");
+    } catch (restoreError) {
+      setError(restoreError.message);
+    } finally {
+      setRestoringVersion(null);
     }
   };
 
@@ -142,7 +186,7 @@ export default function TodoVersionControl({
 
   return (
     <div ref={todoVersionControlRef} className="w-95 h-full min-h-0 bg-surface-container-lowest border-l border-outline-variant flex flex-col shrink-0 sticky top-0 z-10 overflow-hidden">
-      <div className="p-inset-md border-b border-outline-variant flex items-center bg-surface/50 backdrop-blur-md sticky top-0 z-10">
+      <div className="py-3 px-4 border-b border-outline-variant flex items-center bg-surface/50 backdrop-blur-md sticky top-0 z-10">
         <h3 className="font-headline-sm text-headline-sm text-on-surface text-[18px] leading-tight">
           Todo Task &amp; version Control
         </h3>
@@ -150,7 +194,7 @@ export default function TodoVersionControl({
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         {isSummaryVisible && (
-          <div className="p-inset-md border-b border-outline-variant">
+          <div className="py-3 px-4 border-b border-outline-variant">
             <div className="flex items-center justify-between mb-stack-sm">
               <h4 className="font-label-caps text-label-caps text-outline uppercase tracking-wider">
                 AI Summary
@@ -171,7 +215,7 @@ export default function TodoVersionControl({
           </div>
         )}
 
-        <div className="p-inset-md border-b border-outline-variant bg-primary-fixed/30">
+        <div className="py-3 px-4 border-b border-outline-variant bg-primary-fixed/30">
           <div className="flex items-center justify-between mb-stack-md">
             <h4 className="font-label-caps text-label-caps text-primary uppercase tracking-wider font-bold">
               Action Items
@@ -192,7 +236,7 @@ export default function TodoVersionControl({
               {tasks.map((task) => (
                 <div
                   key={task._id}
-                  className="flex items-start gap-3 p-3 bg-surface-container-lowest rounded-lg shadow-sm group"
+                  className="flex items-start gap-3 px-3 py-1 bg-surface-container-lowest rounded-lg shadow-sm group"
                 >
                   <input
                     className="mt-1 w-4 h-4 rounded border-outline text-primary focus:ring-primary accent-primary"
@@ -201,11 +245,44 @@ export default function TodoVersionControl({
                     onChange={() => toggleTask(task)}
                     aria-label={`Mark ${task.title} complete`}
                   />
-                  <span
-                    className={`flex-1 font-body-sm text-[13px] text-on-surface ${task.completed ? "line-through text-on-surface-variant" : ""}`}
+                  {editingTaskId === task._id ? (
+                    <input
+                        ref={editingTaskInputRef}
+                      value={editedTaskTitle}
+                      onChange={(event) => setEditedTaskTitle(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") cancelEditingTask();
+                        if (event.key === "Enter") editTask(task._id);
+                      }}
+                      className="min-w-0 flex-1 px-2 py-1 bg-surface border border-primary rounded text-[13px] focus:outline-none"
+                      aria-label={`Edit ${task.title}`}
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className={`flex-1 font-body-sm text-[13px] pt-1 text-on-surface ${task.completed ? "line-through text-on-surface-variant" : ""}`}
+                    >
+                      {task.title}
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editingTaskId === task._id
+                        ? editTask(task._id)
+                        : startEditingTask(task)
+                    }
+                    data-task-edit-save={editingTaskId === task._id ? "true" : undefined}
+                    disabled={editingTaskId === task._id && !editedTaskTitle.trim()}
+                    className="text-on-surface-variant hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                    title={editingTaskId === task._id ? "Save task" : "Edit task"}
+                    aria-label={editingTaskId === task._id ? "Save task" : `Edit ${task.title}`}
                   >
-                    {task.title}
-                  </span>
+                    <span className="material-symbols-outlined text-[20px]! pt-1">
+                      {editingTaskId === task._id ? "check" : "edit"}
+                    </span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => deleteTask(task._id)}
@@ -213,7 +290,7 @@ export default function TodoVersionControl({
                     title="Delete task"
                     aria-label={`Delete ${task.title}`}
                   >
-                    <span className="material-symbols-outlined text-[18px]">
+                    <span className="material-symbols-outlined text-[20px]! pt-1">
                       delete
                     </span>
                   </button>
@@ -242,7 +319,7 @@ export default function TodoVersionControl({
           </form>
         </div>
 
-        <div className="p-inset-md">
+        <div className="py-3 px-4">
           <h4 className="font-label-caps text-label-caps text-outline uppercase mb-stack-md tracking-wider">
             Version History
           </h4>

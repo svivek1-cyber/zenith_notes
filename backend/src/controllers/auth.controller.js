@@ -33,6 +33,11 @@ function createAuthController(collections) {
     },
     login: async (req, res, next) => {
       try {
+        if (
+          typeof req.body?.email !== "string" ||
+          typeof req.body?.password !== "string"
+        )
+          return res.status(400).json({ message: "Email and password are required" });
         const user = await collections.users.findOne({
           email: req.body.email.toLowerCase(),
         });
@@ -42,7 +47,8 @@ function createAuthController(collections) {
         setAuthCookie(res, user);
         res.json({ user: publicUser(user) });
       } catch (error) {
-        next(error);
+        console.error("Login database error:", error);
+        res.status(503).json({ message: "Login is temporarily unavailable" });
       }
     },
     logout: (req, res) => {
