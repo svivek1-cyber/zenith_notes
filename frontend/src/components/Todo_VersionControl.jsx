@@ -218,7 +218,7 @@ export default function TodoVersionControl({
         <div className="py-3 px-4 border-b border-outline-variant bg-primary-fixed/30">
           <div className="flex items-center justify-between mb-stack-md">
             <h4 className="font-label-caps text-label-caps text-primary uppercase tracking-wider font-bold">
-              Action Items
+              Todo List
             </h4>
             <span className="px-2 py-0.5 bg-primary text-on-primary rounded-full font-body-sm text-[11px] font-medium">
               {pendingCount} Pending

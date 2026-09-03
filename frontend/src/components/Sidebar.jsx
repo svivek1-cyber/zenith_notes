@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { use } from "react";
 
 export default function Sidebar({
   notes,
@@ -91,6 +92,8 @@ export default function Sidebar({
     </div>
   );
 
+  const [viewMoreOption, setViewMoreOptions] = useState(false);
+
   return (
     <aside className="fixed left-0 top-0 h-full w-72 bg-surface-container-low z-50 flex flex-col border-r border-outline-variant">
       <div className="p-inset-md flex items-center gap-3 mb-stack-sm">
@@ -98,7 +101,7 @@ export default function Sidebar({
           Z
         </div>
         <span className="font-headline-sm text-headline-sm text-primary tracking-tight">
-          Zenith ⋮
+          Zenith
         </span>
       </div>
       <div className="flex-1 overflow-y-auto px-inset-md ">
@@ -112,7 +115,24 @@ export default function Sidebar({
             className="min-w-0 w-full bg-transparent outline-none text-sm"
           />
         </label>
-        <button
+        {binNotes.length + binFolders.length > 0 && (
+          <button
+            type="button"
+            onClick={onSelectBin}
+            className={`w-full flex items-center gap-2 my-0.5 px-3 py-1 rounded-lg text-left ${isBin ? "bg-secondary-container text-on-secondary-container font-semibold" : "text-on-surface-variant hover:bg-surface-container-high"}`}
+          >
+            <span className="material-symbols-outlined text-[20px]">
+              delete
+            </span>
+            <span className="font-body-sm text-body-sm">
+              Bin{" "}
+              {binNotes.length + binFolders.length
+                ? `(${binNotes.length + binFolders.length})`
+                : ""}
+            </span>
+          </button>
+        )}
+        {/* <button
           type="button"
           onClick={onSelectBin}
           className={`w-full flex items-center gap-2 my-0.5 px-3 py-1 rounded-lg text-left ${isBin ? "bg-secondary-container text-on-secondary-container font-semibold" : "text-on-surface-variant hover:bg-surface-container-high"}`}
@@ -121,7 +141,7 @@ export default function Sidebar({
           <span className="font-body-sm text-body-sm">
             Bin {binNotes.length + binFolders.length ? `(${binNotes.length + binFolders.length})` : ""}
           </span>
-        </button>
+        </button> */}
         <div className={isBin ? "hidden" : ""}>
           <div className="flex items-center justify-between px-3 mb-stack-sm">
             <p className="font-label-caps text-label-caps text-outline uppercase">
@@ -149,34 +169,62 @@ export default function Sidebar({
               <span className="font-body-sm text-body-sm">All Notes</span>
             </button>
             {folders.map((folder) => (
-              <div
-                key={folder._id}
-                className={`w-full flex items-center gap-2 px-3 rounded-lg ${selectedFolderId === folder._id ? "bg-secondary-container text-on-secondary-container font-semibold" : "text-on-surface-variant hover:bg-surface-container-high"}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => onSelectFolder(folder._id)}
-                  className="min-w-0 flex-1 flex items-center gap-2 text-left"
+              <>
+                <div
+                  key={folder._id}
+                  className={`w-full flex items-center gap-2 px-3 rounded-lg ${selectedFolderId === folder._id ? "bg-secondary-container text-on-secondary-container font-semibold" : "text-on-surface-variant hover:bg-surface-container-high"}`}
                 >
-                  <span className="material-symbols-outlined text-[20px]">
-                    folder
-                  </span>
-                  <span className="font-body-sm text-body-sm truncate">
-                    {folder.name}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDeleteFolder(folder)}
-                  className="shrink-0 text-on-surface-variant hover:text-error"
-                  title="Delete project"
-                  aria-label={`Delete ${folder.name}`}
-                >
-                  <span className="material-symbols-outlined text-[20px]! pt-1">
-                    delete
-                  </span>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => onSelectFolder(folder._id)}
+                    className="min-w-0 flex-1 flex items-center gap-2 text-left"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">
+                      folder
+                    </span>
+                    <span className="font-body-sm text-body-sm truncate">
+                      {folder.name}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setViewMoreOptions(!viewMoreOption)}
+                    className="shrink-0 text-on-surface-variant hover:text-primary"
+                    title="view more"
+                  >
+                    <b>⋮</b>
+                  </button>
+                </div>
+
+                {/*i just want to arise this span as a small window pop just right of view more button  */}
+
+                {/* viewmore popup */}
+                <span className={viewMoreOption ? "display" : "hidden"}>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteFolder(folder)}
+                    className="shrink-0 text-on-surface-variant hover:text-error"
+                    title="Delete project"
+                    aria-label={`Delete ${folder.name}`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]! pt-1">
+                      delete
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    // onClick={() => onDeleteFolder(folder)}
+                    className="shrink-0 text-on-surface-variant hover:text-primary"
+                    title="Rename project"
+                    // aria-label={`Delete ${folder.name}`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]! pt-1">
+                      edit
+                    </span>  
+                  </button>
+                </span>
+              </>
             ))}
             <button
               type="button"
@@ -215,8 +263,12 @@ export default function Sidebar({
                   .map((folder) => (
                     <div key={folder._id} className="space-y-stack-xs">
                       <div className="w-full flex items-center gap-2 px-3 rounded-lg text-on-surface-variant">
-                        <span className="material-symbols-outlined text-[20px]">folder</span>
-                        <span className="font-body-sm text-body-sm truncate flex-1">{folder.name}</span>
+                        <span className="material-symbols-outlined text-[20px]">
+                          folder
+                        </span>
+                        <span className="font-body-sm text-body-sm truncate flex-1">
+                          {folder.name}
+                        </span>
                         <button
                           type="button"
                           onClick={() => onRestoreFolder(folder)}
@@ -224,7 +276,9 @@ export default function Sidebar({
                           title="Restore project"
                           aria-label={`Restore ${folder.name}`}
                         >
-                          <span className="material-symbols-outlined text-[18px]">restore</span>
+                          <span className="material-symbols-outlined text-[18px]">
+                            restore
+                          </span>
                         </button>
                         <button
                           type="button"
@@ -233,18 +287,30 @@ export default function Sidebar({
                           title="Delete project permanently"
                           aria-label={`Delete ${folder.name} permanently`}
                         >
-                          <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                          <span className="material-symbols-outlined text-[18px]">
+                            delete_forever
+                          </span>
                         </button>
                       </div>
                       <nav className="ml-5 space-y-stack-xs">
                         {binNotes
-                          .filter((note) => String(note.folderId) === String(folder._id) && note.title.toLowerCase().includes(search.toLowerCase()))
+                          .filter(
+                            (note) =>
+                              String(note.folderId) === String(folder._id) &&
+                              note.title
+                                .toLowerCase()
+                                .includes(search.toLowerCase()),
+                          )
                           .map(noteLink)}
                       </nav>
                     </div>
                   ))}
                 {binNotes
-                  .filter((note) => !note.folderId && note.title.toLowerCase().includes(search.toLowerCase()))
+                  .filter(
+                    (note) =>
+                      !note.folderId &&
+                      note.title.toLowerCase().includes(search.toLowerCase()),
+                  )
                   .map(noteLink)}
               </>
             ) : (

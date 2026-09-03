@@ -49,7 +49,7 @@ export default function Content({ note, onNoteChange, onTogglePin, handleSaveAnd
           aria-label="Note title"
           className="w-full bg-transparent border-0 p-0 font-display-lg text-display-lg text-on-surface mb-stack-md outline-none font-black text-4xl"
           placeholder="Untitled Note"
-        />
+        /> 
         <div className="flex items-center gap-2 my-2 text-on-surface-variant">
           <span className="material-symbols-outlined text-[16px]">
             calendar_today
